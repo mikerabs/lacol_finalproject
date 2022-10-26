@@ -1,0 +1,228 @@
+---
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+header-includes: \usepackage{color}
+always_allow_html: true
+---
+----
+ Summer 2021: Introduction to Data Science
+---
+
+```{r, echo = F, results = 'hide', message=F, warning = F}
+library(foreign)      #Default package for almost all code, lets your read files into R
+library(ggplot2)      #plotting package
+library(colorspace)   #better colors for ggplot
+library(broom)        #a widely used, but relatively new, package for producing tidier data and tidier output; part of tidyverse
+library(tidyverse)    #a widely used, but relatively new, package for producing tidier data and tidier output
+library(stargazer)    #produces pretty regression tables
+library(knitr)        #helps the knitting process. In particular, it lets the include_graphics command run
+library(gridExtra)    #allows grid.arrange() to produce prettier graphics
+library(GGally)       #for hte correlation matrix at the end ggpairs()
+library(ggridges)
+library(corrr)
+library(scales)
+library(plotly)     #new package
+library(modelr)
+library(devtools)
+library(mlbench)
+```
+
+# Final Project
+
+## Authors: Michael Rabayda and Klaire Pham
+
+This project provides a critical data analysis of the AirBnB market in Berlin following the CRISP-DM process, a cross-industry process for data-mining. The report consists of six phases: business understanding, data understanding, data preparation, modeling, evaluation, and deployment. Notably, the process has been adjusted to attune to the grading rubrics for the final project of the course. 
+
+## Introduction and Business Understanding - KP 
+
+<AirBnB as a business and the AirBnB market in Berlin specifically>
+AirBnB is undeniably one of the most successful startups of the centuries -- the business model has introduced a novel and convenient way to connect short-term visitors to landlords. In fact, AirBnB is so successful that even Berlin, known as a city with extremely tough laws governing vacation rentals, had to overturn their 2016 law banning the model. According to a 2020 analysis by AirDNA, Berlin's vacational rental market is dominated by AirBnB listings with 97% OTA market share. Interestingly, there is a strong trend in seasonality and different hotspots in terms of activity and pricing. 
+
+We decided to examine the trends further. Looking at the dataset containing over 22,000 rental listings in Berlin as of November 2018, right after the ban lift, we decided that it would be interesting to look into the patterns determining the daily price of each listing, be it location, amenities, property type, etc. We are interested in how those variables interact with price firstly, and with each other secondary. 
+
+This data analysis is supposed to help travelers and potential AirBnB hosts in Berlin in many ways. As a potential visitor, we want to think of our trips in two ways: cost optimized and experience optimized. We would attempt to find out how the listing's factors play into its expenditure and rating. As a prospective host, we want to think about how the property can be upgraded for better pricing. Hence, the questions we aim to answer are: 
+
+1) What are the most high-rated room type? Most highly regarded inclusion of amenities? Most highly regarded neighborhood? 
+2) Does popularity always equate high ratings, thus better experience? 
+3) How do variables interact with price? Which neighborhood group is the most pricey? Which room type is the most pricey? 
+
+<What has sparked the team's interests in this dataset -- refer to one of the checkpoints> 
+
+<The questions this data analysis might help a technical/ nontechnical reader> 
+
+<The hypothetical answers initially put forth to those questions -- refer to one of the checkpoints> 
+
+## Data Understanding - KP 
+
+<The source of the data and the focus of the data: qualitative/ quantitative>
+
+<Describe the data in terms of format, quantity, and whether or not the data answers the research questions> 
+
+### 1. Data exploration 
+
+<Visuals reflecting the distribution of important variables + trying out some correlations>
+
+<Describe results of data exploration including first findings, how they conform to initial hypotheses -- refer to one of the checkpoints> 
+
+### 2. Data quality 
+
+<Reflect on whether or not the data cover all possible cases. Evaluate missing values or errors. Evaluate the distribution of the data>
+
+## Data Preparation 
+
+<Rationale for data cleaning and data selection. Report on decisions you took to address data quality problems and evaluate their possible impacts on the analysis' result> 
+
+<Description of the creation of any new data frames, such as testing and training set> 
+
+## Modeling 
+
+<Refer to week 6's checkpoint> 
+
+<Evaluation of each model> 
+
+## Evaluation and Deployment 
+
+<Summarize assessment results including a final statement regarding whether or not the analysis helps us answer the research questions> 
+
+<Potential further actions or research development> 
+
+<Document experience gained during the project>
+
+### Loading the data
+
+```{r, echo = T, results = 'hide', message=F, warning = F}
+listings_summary <- read_csv("listings_summary.csv")
+listings <- read_csv("listings.csv")
+```
+
+## Weekly Checkpoint Unit 6
+
+### 1. Data cleaning 
+
+```{r, echo = F, results = 'hide', message=F, warning = F}
+# Data cleaning
+## Make price, weekly_price, monthly_price, security deposit, cleaning fee, 
+## and extra_people usable double variables 
+listings_summary$price <- as.double(gsub("\\$", "", as.character(listings_summary$price)))
+listings_summary$weekly_price <- as.double(gsub("\\$", "", as.character(listings_summary$weekly_price)))
+listings_summary$monthly_price <- as.double(gsub("\\$", "", as.character(listings_summary$monthly_price)))
+listings_summary$security_deposit <- as.double(gsub("\\$", "", as.character(listings_summary$security_deposit)))
+listings_summary$cleaning_fee <- as.double(gsub("\\$", "", as.character(listings_summary$cleaning_fee)))
+listings_summary$extra_people <- as.double(gsub("\\$", "", as.character(listings_summary$extra_people)))
+
+
+## For Airbnbs' price, most of the observations (over 22,000 of them) is priced under 350
+## euros per night. Thus, it is needed to separate the data frame into usable observations
+## and the outliers. I'd do this for listings_summary as well, right below.
+norm_listings <- listings %>% filter(listings$price <= 350)
+luxury_listings <- listings %>% filter(listings$price > 350)
+
+## Reviews score values are mostly over 7 (over 17,000 of them). There are only a few 
+## dozens observations of reviews_rating_value under 7. Thus, I also separated them.
+## Furthermore, I separate the usable data frame into one with number_of_reviews under 300
+## as well for the same reasons. 
+listings_sum_rv <- listings_summary %>% filter(review_scores_value >= 7,
+                                               review_scores_rating > 70)
+listings_sum_rv_cut <- listings_sum_rv %>% filter(number_of_reviews < 300, price <= 350)
+listings_sum_rv_cut$review_scores_value <- factor(listings_sum_rv_cut$review_scores_value)
+
+## Now, I rename the two data sets that are most worked with 
+smallset <- norm_listings
+largeset <- listings_sum_rv_cut
+```
+
+### 2. Data analysis models 
+
+Current research questions on correlation between variables:
+- How does the price of an Airbnb differ throughout neighborhoods in Berlin, and what neighborhoods are the best value for money? 
+- Can we predict the rating for a listing based on the location, price, or popularity, and what neighborhoods have the greatest influence on those ratings?
+- Taking two approaches, cost optimization and experience optimization, how should a traveller decide on: 
+   - Time to rent an Airbnb in Berlin?
+   - How many additional people to the group?
+   - Which property type/ room type to choose? 
+   
+Hypothesis: The number of guests included and the room type has a positive correlation with the price. Specifically, the more guests included, the higher the price would be. Regarding room type, entire home/apt would cost more than private room, which costs more than shared room. 
+   
+```{r, echo = T, results = 'hide', message=F, warning = F,}
+# Distribution of the relationship between various variables: guests_included, price
+quantile(largeset$price)
+quantile(largeset$guests_included)
+
+# Creating test set and training set
+working_set <- largeset %>%
+  filter(guests_included < 5)
+dt = sort(sample(nrow(working_set), nrow(working_set)*.7))
+train <- working_set[dt,]
+test <- working_set[-dt,]
+```
+
+```{r, echo = T, results = 'hide', message=F, warning = F, fig.height = 4, fig.width = 5}
+# Plotting
+ggplot(train, aes(x = guests_included, y = price)) +
+  geom_jitter()
+
+ggplot(train, aes(x = room_type, y = price)) +
+  geom_boxplot()
+
+ggplot(train, aes(x = guests_included, y = price)) +
+  geom_jitter() +
+  geom_smooth(method = "lm") + 
+  facet_wrap( ~ room_type)
+```
+
+```{r, echo = T, message=F, warning = F}
+# Models 
+mod1 <- lm(price ~ guests_included + room_type, train)
+mod2 <- lm(price ~ guests_included * room_type, train)
+tidy(mod1)
+tidy(mod2)
+# Model 1 is much more reliable 
+```
+
+```{r, echo = T, results = 'hide', message=F, warning = F}
+# Residuals plotting 
+train_mod <- train %>%
+  gather_residuals(mod1, mod2)
+
+ggplot() + 
+  geom_jitter( data = train_mod, aes(x = guests_included, y = resid, colour = room_type), size =1) +
+  facet_grid(room_type ~ model, space = "free")
+
+# No other detections 
+```
+
+```{r, echo = T, results = 'hide', message=F, warning = F}
+# Add predictions 
+grid1 <- train %>%
+  data_grid(guests_included, room_type) %>%
+  add_predictions(mod1, "pred_price")
+
+test <- test %>%
+  data_grid(guests_included, room_type) %>%
+  add_predictions(mod1, "pred_price")
+
+ggplot()+
+  geom_jitter(data = train, aes(x = guests_included, y = price, colour = room_type),
+              size = 1, alpha = .2) +
+  geom_line ( data = grid1, aes(x = guests_included, y = pred_price), 
+              linetype = 'dashed') +
+  geom_point(data = test, aes(x = guests_included, y = pred_price) , size = 3) + 
+  facet_wrap(~ room_type)
+```
+
+   - Describe accurately the data analysis model which you will use to answer your research questions. For example, if you are using regression analysis, provide the regression model you will use, the equation used to describe it and explain the parameters used.
+   
+I am using a linear regression model of an Airbnb's daily price as a function of the number of guests included in the rent and the room's type. Through model analysis, I was able to identify the lack of interaction between the two explanatory parameters, which makes the abstract equation similar to this: 
+
+Price = Intercept + A * Number of guests + B * Room's type 
+
+   - Describe any challenges you foresee in using the model you chose given the data you have. What are your model assumptions to account for such aspects of your data?
+   
+The challenge that interferes with regression model's assumptions is that the plot of the residuals. Considering that the data was large left-skewed, the residuals are not randomly distributed on the plot. It might be that a linear model would not describe accurately the relationship and some unseen trends might have been missed. The residuals versus fitted values plot is difficult to interpret as well.
+
+```{r, echo = T, results = 'hide', message=F, warning = F}
+# Plot each residual value plotted against the corresponding predicted value 
+plots <- plot(lm(price ~ guests_included + room_type, data = train))
+```
